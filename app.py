@@ -348,9 +348,9 @@ if banco_file and interno_file:
             dias_ok = sum(1 for r in rows if r['is_ok'])
             summary_rows.append({
                 'Procesador': proc,
-                'Banco (CLP)': total_b,
-                'AR Processors (CLP)': total_i,
-                'Diferencia (CLP)': diff_t,
+                'Banco (CLP)': f"{total_b:,.0f}",
+                'AR Processors (CLP)': f"{total_i:,.0f}",
+                'Diferencia (CLP)': f"{diff_t:+,.0f}",
                 'Dif. %': f"{pct_t:+.1f}%",
                 'Días OK': f"{dias_ok}/{len(rows)}",
                 'Estado': "✅ OK" if abs(pct_t) <= tolerance else ("🔴 Cobro menor" if diff_t < 0 else "🟡 Cobro mayor")
