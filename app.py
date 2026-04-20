@@ -42,7 +42,7 @@ with st.sidebar:
     use_refund = st.checkbox("REFUND", value=False)
     custom_concepts = st.text_area("Otros conceptos (uno por línea)", value="")
     st.markdown("---")
-    tolerance = st.number_input("Tolerancia sin alerta (CLP)", value=1000, step=500)
+    tolerance = st.number_input("Tolerancia sin alerta (%)", value=10, step=1, min_value=0, max_value=100)
 
 active_concepts = []
 if use_payment: active_concepts.append("PAYMENT")
@@ -189,7 +189,9 @@ def build_excel(rows, processor, period):
         r = idx + 3
         bg_alt = "F2F7FB" if idx % 2 == 0 else "FFFFFF"
         diff = row['diff']
-        if abs(diff) < 1000:
+        pct = abs(diff / row['interno'] * 100) if row['interno'] else None
+        is_ok = pct is not None and pct <= 10
+        if is_ok:
             st_bg, st_txt, st_lbl = "D9F7D9", "1A6B1A", "OK"
         elif diff < 0:
             st_bg, st_txt, st_lbl = "FFDAD9", "8B1A1A", "Falta en banco"
@@ -285,12 +287,14 @@ if banco_file and interno_file:
             b = banco_data.get(d)
             i = interno_data.get(d)
             diff = (b or 0) - (i or 0)
-            rows.append({'fecha': d, 'banco': b, 'interno': i, 'diff': diff})
+            pct = abs(diff / i * 100) if i else None
+            is_ok = pct is not None and pct <= tolerance
+            rows.append({'fecha': d, 'banco': b, 'interno': i, 'diff': diff, 'pct': pct, 'is_ok': is_ok})
 
         total_banco = sum(r['banco'] for r in rows if r['banco'])
         total_interno = sum(r['interno'] for r in rows if r['interno'])
         diff_neta = total_banco - total_interno
-        dias_ok = sum(1 for r in rows if abs(r['diff']) < tolerance)
+        dias_ok = sum(1 for r in rows if r['is_ok'])
         dias_diff = len(rows) - dias_ok
 
         st.markdown("---")
@@ -308,11 +312,12 @@ if banco_file and interno_file:
 
         display_rows = []
         for r in rows:
-            if filter_opt == "Solo con diferencias" and abs(r['diff']) < tolerance: continue
-            if filter_opt == "Solo OK" and abs(r['diff']) >= tolerance: continue
+            if filter_opt == "Solo con diferencias" and r['is_ok']: continue
+            if filter_opt == "Solo OK" and not r['is_ok']: continue
 
             diff = r['diff']
-            if abs(diff) < tolerance:
+            pct = r['pct']
+            if r['is_ok']:
                 estado = "✅ OK"
             elif diff < 0:
                 estado = "🔴 Falta en banco"
@@ -324,9 +329,20 @@ if banco_file and interno_file:
                 "Banco (CLP)": f"{r['banco']:,.0f}" if r['banco'] else "-",
                 "Interno (CLP)": f"{r['interno']:,.0f}" if r['interno'] else "-",
                 "Diferencia (CLP)": f"{diff:+,.0f}",
-                "Dif. %": f"{diff/r['interno']*100:+.1f}%" if r['interno'] else "-",
+                "Dif. %": f"{pct:+.1f}%" if pct is not None else "-",
                 "Estado": estado
             })
+
+        # Fila de totales
+        total_pct = diff_neta / total_interno * 100 if total_interno else 0
+        display_rows.append({
+            "Fecha": "**TOTAL**",
+            "Banco (CLP)": f"**{total_banco:,.0f}**",
+            "Interno (CLP)": f"**{total_interno:,.0f}**",
+            "Diferencia (CLP)": f"**{diff_neta:+,.0f}**",
+            "Dif. %": f"**{total_pct:+.1f}%**",
+            "Estado": "✅ OK" if abs(total_pct) <= tolerance else ("🔴 Falta en banco" if diff_neta < 0 else "🟡 Falta en interno")
+        })
 
         st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
 
