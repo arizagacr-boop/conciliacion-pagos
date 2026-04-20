@@ -320,22 +320,18 @@ if banco_file and interno_file:
         run = st.button("▶ Analizar conciliación", type="primary", use_container_width=True)
 
     if run and selected_processors:
+        # Procesar y guardar en session_state
         results = {}
         summary_rows = []
 
         for proc in selected_processors:
-            # Banco por día
             banco_proc = banco_df[banco_df['Processor'] == proc].copy()
             banco_by_day = banco_proc.groupby(banco_proc['Transaction date'].dt.strftime("%d/%m"))['Credit'].sum().to_dict()
-
-            # AR por día
             ar_proc = ar_df[ar_df['Processor'] == proc].copy()
             ar_by_day = ar_proc.groupby('Day')['Amount'].sum().to_dict()
-
             all_dates = sorted(set(list(banco_by_day.keys()) + list(ar_by_day.keys())))
             if not all_dates:
                 continue
-
             rows = []
             for d in all_dates:
                 b = banco_by_day.get(d, 0) or 0
@@ -344,9 +340,7 @@ if banco_file and interno_file:
                 pct = abs(diff / i * 100) if i else None
                 is_ok = pct is not None and pct <= tolerance
                 rows.append({'fecha': d, 'banco': b, 'interno': i, 'diff': diff, 'pct': pct, 'is_ok': is_ok})
-
             results[proc] = rows
-
             total_b = sum(r['banco'] for r in rows)
             total_i = sum(r['interno'] for r in rows)
             diff_t = total_b - total_i
@@ -362,17 +356,27 @@ if banco_file and interno_file:
                 'Estado': "✅ OK" if abs(pct_t) <= tolerance else ("🔴 Cobro menor" if diff_t < 0 else "🟡 Cobro mayor")
             })
 
-        # ── Resumen general
+        # Guardar en session_state para no re-procesar
+        st.session_state['results'] = results
+        st.session_state['summary_rows'] = summary_rows
+
+    # Mostrar resultados desde session_state (no se re-procesa al cambiar filtros)
+    if 'results' in st.session_state and st.session_state['results']:
+        results = st.session_state['results']
+        summary_rows = st.session_state['summary_rows']
+
         st.markdown("---")
         st.subheader("📈 Resumen por procesador")
         st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
 
-        # ── Detalle por procesador
         st.markdown("---")
         st.subheader("📅 Detalle por día")
 
-        selected_detail = st.selectbox("Ver detalle de:", list(results.keys()))
-        filter_opt = st.radio("Mostrar:", ["Todos","Solo con diferencias","Solo OK"], horizontal=True)
+        det_col1, det_col2 = st.columns([2,2])
+        with det_col1:
+            selected_detail = st.selectbox("Ver detalle de:", list(results.keys()), key="detail_proc")
+        with det_col2:
+            filter_opt = st.radio("Mostrar:", ["Todos","Solo con diferencias","Solo OK"], horizontal=True, key="filter_opt")
 
         if selected_detail and selected_detail in results:
             detail_rows = []
@@ -393,7 +397,6 @@ if banco_file and interno_file:
                     "Estado": estado
                 })
 
-            # Total row
             rows_sel = results[selected_detail]
             tb = sum(r['banco'] for r in rows_sel)
             ti = sum(r['interno'] for r in rows_sel)
@@ -410,7 +413,6 @@ if banco_file and interno_file:
 
             st.dataframe(pd.DataFrame(detail_rows), use_container_width=True, hide_index=True)
 
-        # ── Descarga
         st.markdown("---")
         all_dates_flat = []
         for rows in results.values():
