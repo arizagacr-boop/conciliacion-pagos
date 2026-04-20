@@ -214,9 +214,9 @@ def build_excel(rows, processor, period):
         if is_ok:
             st_bg, st_txt, st_lbl = "D9F7D9", "1A6B1A", "OK"
         elif diff < 0:
-            st_bg, st_txt, st_lbl = "FFDAD9", "8B1A1A", "Falta en banco"
+            st_bg, st_txt, st_lbl = "FFDAD9", "8B1A1A", "Cobro menor"
         else:
-            st_bg, st_txt, st_lbl = "FFF3CD", "7A5A00", "Falta en interno"
+            st_bg, st_txt, st_lbl = "FFF3CD", "7A5A00", "Cobro mayor"
 
         for c in range(1, 7):
             cell = ws.cell(row=r, column=c)
@@ -340,9 +340,9 @@ if banco_file and interno_file:
             if r['is_ok']:
                 estado = "✅ OK"
             elif diff < 0:
-                estado = "🔴 Falta en banco"
+                estado = "🔴 Cobro menor"
             else:
-                estado = "🟡 Falta en interno"
+                estado = "🟡 Cobro mayor"
 
             display_rows.append({
                 "Fecha": r['fecha'],
@@ -361,7 +361,7 @@ if banco_file and interno_file:
             "Interno (CLP)": f"**{total_interno:,.0f}**",
             "Diferencia (CLP)": f"**{diff_neta:+,.0f}**",
             "Dif. %": f"**{total_pct:+.1f}%**",
-            "Estado": "✅ OK" if abs(total_pct) <= tolerance else ("🔴 Falta en banco" if diff_neta < 0 else "🟡 Falta en interno")
+            "Estado": "✅ OK" if abs(total_pct) <= tolerance else ("🔴 Cobro menor" if diff_neta < 0 else "🟡 Cobro mayor")
         })
 
         st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
@@ -385,4 +385,3 @@ else:
         4. La herramienta reconcilia automáticamente por día y te muestra las diferencias
         5. Descargá el Excel con el detalle completo y colores por estado
         """)
-
