@@ -61,6 +61,30 @@ RULES = [
     ("TRANSF. DE",                    "KHIPU"),
 ]
 
+# Mapeo de nombres AR → nombre master de la regla
+AR_PROCESSOR_MAP = {
+    "servipag":                    "SERVIPAG",
+    "transbank":                   "TRANSBK",
+    "transbank (old)":             "TRANSBK",
+    "transbank psp":               "TRANSBK",
+    "transbank webpay plus psp":   "TRANSBK",
+    "getnet":                      "GETNET",
+    "klap":                        "KLAP",
+    "kushki":                      "KUSHKI",
+    "mercadopago":                 "MERCADO PAGO",
+    "mercado pago":                "MERCADO PAGO",
+    "khipu":                       "KHIPU",
+}
+
+IGNORE_AR_PROCESSORS = ["banco itaú", "banco itau", "banco itaãº"]
+
+def normalize_ar_processor(name):
+    if not isinstance(name, str): return None
+    clean = name.strip().lower()
+    for ignore in IGNORE_AR_PROCESSORS:
+        if ignore in clean: return None
+    return AR_PROCESSOR_MAP.get(clean, name.upper())
+
 def get_processor(concept):
     if not isinstance(concept, str): return None
     for keyword, processor in RULES:
@@ -157,6 +181,8 @@ def parse_interno(file, col_d, col_a, col_p):
         df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
         df = df[df['Date'].notna()]
         df['Day'] = df['Date'].dt.strftime("%d/%m")
+        df['Processor'] = df['Processor'].apply(normalize_ar_processor)
+        df = df[df['Processor'].notna()]
         return df
     except Exception as e:
         st.error(f"Error leyendo AR Processors: {e}")
@@ -272,10 +298,9 @@ if banco_file and interno_file:
     if banco_df.empty or ar_df.empty:
         st.stop()
 
-    # Procesadores identificados en el banco
-    processors_in_banco = sorted(banco_df['Processor'].dropna().unique().tolist())
-    processors_in_ar = sorted(ar_df['Processor'].dropna().unique().tolist())
-    all_processors = sorted(set(processors_in_banco + processors_in_ar))
+    # Siempre usar los 7 procesadores master de las reglas
+    MASTER_PROCESSORS = ["GETNET", "KHIPU", "KLAP", "KUSHKI", "MERCADO PAGO", "SERVIPAG", "TRANSBK"]
+    all_processors = MASTER_PROCESSORS
 
     if not all_processors:
         st.warning("No se identificaron procesadores. Revisá las reglas cargadas.")
@@ -304,7 +329,7 @@ if banco_file and interno_file:
             banco_by_day = banco_proc.groupby(banco_proc['Transaction date'].dt.strftime("%d/%m"))['Credit'].sum().to_dict()
 
             # AR por día
-            ar_proc = ar_df[ar_df['Processor'].str.upper() == proc.upper()].copy()
+            ar_proc = ar_df[ar_df['Processor'] == proc].copy()
             ar_by_day = ar_proc.groupby('Day')['Amount'].sum().to_dict()
 
             all_dates = sorted(set(list(banco_by_day.keys()) + list(ar_by_day.keys())))
