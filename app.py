@@ -11,17 +11,27 @@ st.set_page_config(page_title="Conciliación Servipag", page_icon="📊", layout
 
 st.markdown("""
 <style>
-    .main { background-color: #f8f9fb; }
+    .stApp { background-color: #0d0d0d; }
+    .main { background-color: #0d0d0d; }
     .block-container { padding: 2rem 2rem 2rem; }
-    h1 { color: #1a365d; font-size: 1.8rem; }
-    h3 { color: #2d4a7a; }
-    .stAlert { border-radius: 8px; }
-    div[data-testid="metric-container"] {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 1rem;
-    }
+    section[data-testid="stSidebar"] { background-color: #111111; border-right: 1px solid #1a4a8a; }
+    section[data-testid="stSidebar"] * { color: #c8d8f0 !important; }
+    section[data-testid="stSidebar"] input { background-color: #1a1a1a !important; border: 1px solid #1a4a8a !important; color: #ffffff !important; border-radius: 6px !important; }
+    h1 { color: #4a9eff !important; font-size: 1.8rem; }
+    h2, h3 { color: #4a9eff !important; }
+    p, span, label, div { color: #e0e0e0; }
+    div[data-testid="metric-container"] { background: #111111; border: 1px solid #1a4a8a; border-radius: 10px; padding: 1rem; }
+    div[data-testid="metric-container"] label { color: #7aaeff !important; }
+    div[data-testid="metric-container"] div { color: #ffffff !important; }
+    .stRadio label { color: #c8d8f0 !important; }
+    input[type="number"] { background-color: #1a1a1a !important; color: #ffffff !important; border: 1px solid #1a4a8a !important; }
+    .stDownloadButton button { background-color: #1a4a8a !important; color: #ffffff !important; border: none !important; border-radius: 8px !important; font-weight: 600 !important; }
+    .stDownloadButton button:hover { background-color: #4a9eff !important; }
+    .stAlert { border-radius: 8px; background-color: #111111 !important; border-left: 4px solid #4a9eff !important; }
+    .stDataFrame { border: 1px solid #1a4a8a; border-radius: 8px; }
+    .stFileUploader { border: 1px dashed #1a4a8a !important; border-radius: 8px; background-color: #111111 !important; }
+    .streamlit-expanderHeader { color: #4a9eff !important; }
+    hr { border-color: #1a4a8a !important; }
 </style>
 """, unsafe_allow_html=True)
 
