@@ -7,7 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from datetime import datetime
 
-st.set_page_config(page_title="Conciliación Servipag", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Check Payins", page_icon="📊", layout="wide")
 
 st.markdown("""
 <style>
@@ -35,8 +35,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Conciliación de Pagos")
-st.markdown("Cargá el **extracto bancario** (PDF) y la **planilla interna** (Excel) para reconciliar por día.")
+st.title("📊 Check Payins")
+st.markdown("Cargá el **extracto bancario** (PDF) y el **AR Processors** (Excel) para reconciliar por día.")
 
 # ── Sidebar config ─────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -67,8 +67,8 @@ with col1:
     st.subheader("🏦 Extracto Bancario")
     banco_file = st.file_uploader("PDF del banco", type=["pdf"], key="banco")
 with col2:
-    st.subheader("📋 Planilla Interna")
-    interno_file = st.file_uploader("Excel con datos internos", type=["xlsx", "xls", "csv"], key="interno")
+    st.subheader("📋 AR Processors")
+    interno_file = st.file_uploader("AR Processors", type=["xlsx", "xls", "csv"], key="interno")
 
 # ── Parse PDF ─────────────────────────────────────────────────────────────────
 def parse_banco_pdf(file, concepts):
@@ -370,7 +370,7 @@ else:
     with st.expander("ℹ️ ¿Cómo usar esta herramienta?"):
         st.markdown("""
         1. **Extracto bancario**: PDF exportado de tu banco (Citi, BICE, etc.)
-        2. **Planilla interna**: Excel con los pagos registrados internamente, con columnas de fecha, monto y procesador
+        2. **AR Processors**: Excel con los pagos registrados internamente, con columnas de fecha, monto y procesador
         3. **Configurá** en el sidebar izquierdo los nombres de columnas y conceptos a filtrar
         4. La herramienta reconcilia automáticamente por día y te muestra las diferencias
         5. Descargá el Excel con el detalle completo y colores por estado
