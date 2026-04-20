@@ -200,7 +200,7 @@ def build_excel(rows, processor, period):
     t.alignment = Alignment(horizontal='center', vertical='center')
     ws.row_dimensions[1].height = 26
 
-    headers = ['Fecha', 'Banco (CLP)', 'Interno (CLP)', 'Diferencia (CLP)', 'Dif. %', 'Estado']
+    headers = ['Fecha', 'Banco (CLP)', 'AR Processors (CLP)', 'Diferencia (CLP)', 'Dif. %', 'Estado']
     for i, h in enumerate(headers, 1):
         hdr(2, i, h)
     ws.row_dimensions[2].height = 22
@@ -321,7 +321,7 @@ if banco_file and interno_file:
         st.subheader("📈 Resumen")
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total banco (CLP)", f"{total_banco:,.0f}")
-        m2.metric("Total interno (CLP)", f"{total_interno:,.0f}")
+        m2.metric("Total AR Processors (CLP)", f"{total_interno:,.0f}")
         m3.metric("Diferencia neta (CLP)", f"{diff_neta:,.0f}", delta=f"{diff_neta/total_interno*100:.1f}%" if total_interno else None)
         m4.metric("Días con diferencia", f"{dias_diff} / {len(rows)}")
 
@@ -347,7 +347,7 @@ if banco_file and interno_file:
             display_rows.append({
                 "Fecha": r['fecha'],
                 "Banco (CLP)": f"{r['banco']:,.0f}" if r['banco'] else "-",
-                "Interno (CLP)": f"{r['interno']:,.0f}" if r['interno'] else "-",
+                "AR Processors (CLP)": f"{r['interno']:,.0f}" if r['interno'] else "-",
                 "Diferencia (CLP)": f"{diff:+,.0f}",
                 "Dif. %": f"{pct:+.1f}%" if pct is not None else "-",
                 "Estado": estado
@@ -358,7 +358,7 @@ if banco_file and interno_file:
         display_rows.append({
             "Fecha": "**TOTAL**",
             "Banco (CLP)": f"**{total_banco:,.0f}**",
-            "Interno (CLP)": f"**{total_interno:,.0f}**",
+            "AR Processors (CLP)": f"**{total_interno:,.0f}**",
             "Diferencia (CLP)": f"**{diff_neta:+,.0f}**",
             "Dif. %": f"**{total_pct:+.1f}%**",
             "Estado": "✅ OK" if abs(total_pct) <= tolerance else ("🔴 Cobro menor" if diff_neta < 0 else "🟡 Cobro mayor")
