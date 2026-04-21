@@ -144,8 +144,9 @@ def parse_banco_excel(file_bytes, file_name):
         raw_buf = io.BytesIO(file_bytes)
 
         # Encontrar fila de encabezado (solo leer 20 filas)
-        if file_name.endswith(".csv"):
-            raw = pd.read_csv(raw_buf, header=None, nrows=20)
+        is_csv = file_name.lower().endswith(".csv")
+        if is_csv:
+            raw = pd.read_csv(raw_buf, header=None, nrows=20, encoding='utf-8-sig')
         else:
             raw = pd.read_excel(raw_buf, header=None, nrows=20)
 
@@ -158,26 +159,22 @@ def parse_banco_excel(file_bytes, file_name):
             st.error("No encontré encabezados. Asegurate de usar el formato Kyriba.")
             return pd.DataFrame()
 
-        # Columnas que necesitamos: Account code(0), Transaction date(2), Description(5), Complementary info(6), Credit(10)
+        # Leer solo columnas necesarias por índice
         NEEDED_COLS = [0, 2, 5, 6, 10]
         NEEDED_NAMES = ['Account code', 'Transaction date', 'Description', 'Complementary info', 'Credit']
 
         raw_buf = io.BytesIO(file_bytes)
-        if file_name.endswith(".csv"):
+        if is_csv:
             df = pd.read_csv(
                 raw_buf,
                 header=header_row,
                 usecols=NEEDED_COLS,
                 dtype=str,
-                low_memory=False,
-                skiprows=range(1, header_row) if header_row > 0 else None
+                encoding='utf-8-sig',
+                low_memory=False
             )
         else:
-            df = pd.read_excel(
-                raw_buf,
-                header=header_row,
-                usecols=NEEDED_COLS
-            )
+            df = pd.read_excel(raw_buf, header=header_row, usecols=NEEDED_COLS, dtype=str)
 
         df.columns = NEEDED_NAMES
 
@@ -186,10 +183,12 @@ def parse_banco_excel(file_bytes, file_name):
         df = df[df['Account code'].notna() & ~df['Description'].isin(exclude)].copy()
         df['Transaction date'] = pd.to_datetime(df['Transaction date'], errors='coerce')
         df = df[df['Transaction date'].notna()]
-        df['Credit'] = pd.to_numeric(df['Credit'], errors='coerce').fillna(0)
-        df['Processor'] = df['Complementary info'].apply(get_processor)
 
-        # Solo quedarnos con columnas finales necesarias
+        # Limpiar montos — remover comas de miles antes de convertir
+        df['Credit'] = df['Credit'].astype(str).str.replace(',', '', regex=False)
+        df['Credit'] = pd.to_numeric(df['Credit'], errors='coerce').fillna(0)
+
+        df['Processor'] = df['Complementary info'].apply(get_processor)
         df = df[['Account code', 'Transaction date', 'Complementary info', 'Credit', 'Processor']]
         return df
     except Exception as e:
