@@ -130,8 +130,8 @@ with st.sidebar:
 # ── FILE UPLOADS ───────────────────────────────────────────────────────────────
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("🏦 Extracto Bancario")
-    banco_file = st.file_uploader("Excel del banco (Treasury Factory)", type=["xlsx","xls","csv"], key="banco")
+    st.subheader("🏦 Kyriba")
+    banco_file = st.file_uploader("Excel exportado de Kyriba", type=["xlsx","xls","csv"], key="banco")
 with col2:
     st.subheader("📋 AR Processors")
     interno_file = st.file_uploader("Excel AR Processors", type=["xlsx","xls","csv"], key="interno")
@@ -430,7 +430,7 @@ else:
     st.info("👆 Cargá los dos archivos para comenzar el análisis.")
     with st.expander("ℹ️ ¿Cómo usar esta herramienta?"):
         st.markdown("""
-        1. **Extracto bancario**: Excel exportado de Treasury Factory (todos los movimientos)
+        1. **Kyriba**: Excel exportado de Kyriba (todos los movimientos)
         2. **AR Processors**: Excel con pagos internos por procesador
         3. La herramienta identifica automáticamente cada procesador usando las reglas cargadas
         4. Seleccioná qué procesadores analizar y hacé clic en **Analizar**
