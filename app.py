@@ -85,10 +85,35 @@ def normalize_ar_processor(name):
         if ignore in clean: return None
     return AR_PROCESSOR_MAP.get(clean, name.upper())
 
-def get_processor(concept):
+KHIPU_ACCOUNTS = {'222724234', '213906142', '222718810'}
+
+# Cuentas a ignorar completamente — no son pagos de procesadores
+EXCLUDED_ACCOUNTS = {'213880962'}
+
+# Conceptos que aunque matcheen una regla, NO son pagos de procesadores
+KHIPU_EXCLUSIONS = [
+    'D-LOCAL CHILE',
+    'DLOCAL CHILE',
+    'DLOCAL',
+    'ABONO OP RENTA FIJA',
+    'TRANSF. A ',
+    'TRANSF A ',
+    'VOPERO SPA',
+    'LARRAIN VIAL',
+]
+
+def get_processor(concept, account_id=None):
     if not isinstance(concept, str): return None
+    if str(account_id).strip() in EXCLUDED_ACCOUNTS:
+        return None
     for keyword, processor in RULES:
         if keyword.upper() in concept.upper():
+            if processor == 'KHIPU':
+                if str(account_id).strip() not in KHIPU_ACCOUNTS:
+                    return None
+                # Excluir conceptos que no son KHIPU aunque matcheen
+                if any(excl.upper() in concept.upper() for excl in KHIPU_EXCLUSIONS):
+                    return None
             return processor
     return None
 
@@ -159,9 +184,9 @@ def parse_banco_excel(file_bytes, file_name):
             st.error("No encontré encabezados. Asegurate de usar el formato Kyriba.")
             return pd.DataFrame()
 
-        # Leer solo columnas necesarias por índice
-        NEEDED_COLS = [0, 2, 5, 6, 10]
-        NEEDED_NAMES = ['Account code', 'Transaction date', 'Description', 'Complementary info', 'Credit']
+        # Leer solo columnas necesarias por índice (col 1 = Account ID para restricción KHIPU)
+        NEEDED_COLS = [0, 1, 2, 5, 6, 10]
+        NEEDED_NAMES = ['Account code', 'Account ID', 'Transaction date', 'Description', 'Complementary info', 'Credit']
 
         raw_buf = io.BytesIO(file_bytes)
         if is_csv:
@@ -188,8 +213,8 @@ def parse_banco_excel(file_bytes, file_name):
         df['Credit'] = df['Credit'].astype(str).str.replace(',', '', regex=False)
         df['Credit'] = pd.to_numeric(df['Credit'], errors='coerce').fillna(0)
 
-        df['Processor'] = df['Complementary info'].apply(get_processor)
-        df = df[['Account code', 'Transaction date', 'Complementary info', 'Credit', 'Processor']]
+        df['Processor'] = df.apply(lambda r: get_processor(r['Complementary info'], r['Account ID']), axis=1)
+        df = df[['Account code', 'Account ID', 'Transaction date', 'Complementary info', 'Credit', 'Processor']]
         return df
     except Exception as e:
         st.error(f"Error leyendo extracto: {e}")
