@@ -137,39 +137,72 @@ with col2:
     interno_file = st.file_uploader("Excel AR Processors", type=["xlsx","xls","csv"], key="interno")
 
 # ── PARSE BANCO ────────────────────────────────────────────────────────────────
-def parse_banco_excel(file):
+@st.cache_data(show_spinner=False)
+def parse_banco_excel(file_bytes, file_name):
     try:
-        raw = pd.read_excel(file, header=None) if not file.name.endswith(".csv") else pd.read_csv(file, header=None)
+        import io
+        raw_buf = io.BytesIO(file_bytes)
+
+        # Encontrar fila de encabezado (solo leer 20 filas)
+        if file_name.endswith(".csv"):
+            raw = pd.read_csv(raw_buf, header=None, nrows=20)
+        else:
+            raw = pd.read_excel(raw_buf, header=None, nrows=20)
+
         header_row = None
         for i, row in raw.iterrows():
             if any("Transaction date" in str(v) for v in row.values):
                 header_row = i
                 break
         if header_row is None:
-            st.error("No encontré encabezados. Asegurate de usar el formato Treasury Factory.")
+            st.error("No encontré encabezados. Asegurate de usar el formato Kyriba.")
             return pd.DataFrame()
 
-        df = pd.read_excel(file, header=header_row) if not file.name.endswith(".csv") else pd.read_csv(file, header=header_row)
-        df.columns = ['Account code','Account ID','Transaction date','Value date',
-                      'Description full','Description','Complementary info',
-                      'Reference','Other reference','Debit','Credit']
+        # Columnas que necesitamos: Account code(0), Transaction date(2), Description(5), Complementary info(6), Credit(10)
+        NEEDED_COLS = [0, 2, 5, 6, 10]
+        NEEDED_NAMES = ['Account code', 'Transaction date', 'Description', 'Complementary info', 'Credit']
 
-        exclude = ['Opening balance','Closing balance','Description','Transaction date']
+        raw_buf = io.BytesIO(file_bytes)
+        if file_name.endswith(".csv"):
+            df = pd.read_csv(
+                raw_buf,
+                header=header_row,
+                usecols=NEEDED_COLS,
+                dtype=str,
+                low_memory=False,
+                skiprows=range(1, header_row) if header_row > 0 else None
+            )
+        else:
+            df = pd.read_excel(
+                raw_buf,
+                header=header_row,
+                usecols=NEEDED_COLS
+            )
+
+        df.columns = NEEDED_NAMES
+
+        # Filtrar filas de balance y vacías
+        exclude = ['Opening balance', 'Closing balance', 'Description', 'Transaction date']
         df = df[df['Account code'].notna() & ~df['Description'].isin(exclude)].copy()
         df['Transaction date'] = pd.to_datetime(df['Transaction date'], errors='coerce')
         df = df[df['Transaction date'].notna()]
         df['Credit'] = pd.to_numeric(df['Credit'], errors='coerce').fillna(0)
-        df['Debit']  = pd.to_numeric(df['Debit'],  errors='coerce').fillna(0)
         df['Processor'] = df['Complementary info'].apply(get_processor)
+
+        # Solo quedarnos con columnas finales necesarias
+        df = df[['Account code', 'Transaction date', 'Complementary info', 'Credit', 'Processor']]
         return df
     except Exception as e:
         st.error(f"Error leyendo extracto: {e}")
         return pd.DataFrame()
 
 # ── PARSE AR ───────────────────────────────────────────────────────────────────
-def parse_interno(file, col_d, col_a, col_p):
+@st.cache_data(show_spinner=False)
+def parse_interno(file_bytes, file_name, col_d, col_a, col_p):
     try:
-        df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
+        import io
+        buf = io.BytesIO(file_bytes)
+        df = pd.read_csv(buf) if file_name.endswith(".csv") else pd.read_excel(buf)
         df.columns = [str(c).strip() for c in df.columns]
         missing = [c for c in [col_p, col_d, col_a] if c not in df.columns]
         if missing:
@@ -187,6 +220,10 @@ def parse_interno(file, col_d, col_a, col_p):
     except Exception as e:
         st.error(f"Error leyendo AR Processors: {e}")
         return pd.DataFrame()
+
+@st.cache_data(show_spinner=False)
+def read_file_bytes(uploaded_file):
+    return uploaded_file.read()
 
 # ── BUILD EXCEL ────────────────────────────────────────────────────────────────
 def build_excel(results, period):
@@ -292,8 +329,10 @@ def build_excel(results, period):
 # ── MAIN ───────────────────────────────────────────────────────────────────────
 if banco_file and interno_file:
     with st.spinner("Procesando archivos..."):
-        banco_df = parse_banco_excel(banco_file)
-        ar_df = parse_interno(interno_file, col_date, col_amount, col_processor)
+        banco_bytes = banco_file.read()
+        interno_bytes = interno_file.read()
+        banco_df = parse_banco_excel(banco_bytes, banco_file.name)
+        ar_df = parse_interno(interno_bytes, interno_file.name, col_date, col_amount, col_processor)
 
     if banco_df.empty or ar_df.empty:
         st.stop()
@@ -338,7 +377,7 @@ if banco_file and interno_file:
                 i = ar_by_day.get(d, 0) or 0
                 diff = b - i
                 pct = abs(diff / i * 100) if i else None
-                is_ok = pct is not None and pct <= tolerance
+                is_ok = pct is not None and pct <= tolerance and i > 0
                 rows.append({'fecha': d, 'banco': b, 'interno': i, 'diff': diff, 'pct': pct, 'is_ok': is_ok})
             results[proc] = rows
             total_b = sum(r['banco'] for r in rows)
@@ -353,7 +392,7 @@ if banco_file and interno_file:
                 'Diferencia (CLP)': f"{diff_t:+,.0f}",
                 'Dif. %': f"{pct_t:+.1f}%",
                 'Días OK': f"{dias_ok}/{len(rows)}",
-                'Estado': "✅ OK" if abs(pct_t) <= tolerance else ("🔴 Cobro menor" if diff_t < 0 else "🟡 Cobro mayor")
+                'Estado': "⚠️ Sin dato AR" if total_i == 0 else ("✅ OK" if abs(pct_t) <= tolerance else ("🔴 Cobro menor" if diff_t < 0 else "🟡 Cobro mayor"))
             })
 
         # Guardar en session_state para no re-procesar
@@ -385,7 +424,8 @@ if banco_file and interno_file:
                 if filter_opt == "Solo OK" and not r['is_ok']: continue
                 diff = r['diff']
                 pct = r['pct']
-                if r['is_ok']: estado = "✅ OK"
+                if r['interno'] == 0: estado = "⚠️ Sin dato AR"
+                elif r['is_ok']: estado = "✅ OK"
                 elif diff < 0: estado = "🔴 Cobro menor"
                 else: estado = "🟡 Cobro mayor"
                 detail_rows.append({
@@ -408,7 +448,7 @@ if banco_file and interno_file:
                 "AR Processors (CLP)": f"**{ti:,.0f}**",
                 "Diferencia (CLP)": f"**{td:+,.0f}**",
                 "Dif. %": f"**{tp:+.1f}%**",
-                "Estado": "✅ OK" if abs(tp) <= tolerance else ("🔴 Cobro menor" if td < 0 else "🟡 Cobro mayor")
+                "Estado": "⚠️ Sin dato AR" if ti == 0 else ("✅ OK" if abs(tp) <= tolerance else ("🔴 Cobro menor" if td < 0 else "🟡 Cobro mayor"))
             })
 
             st.dataframe(pd.DataFrame(detail_rows), use_container_width=True, hide_index=True)
